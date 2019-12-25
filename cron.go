@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -15,23 +16,33 @@ var tickerIDs []string
 var tickerIDsMap map[string]string
 var tickers map[string]float64
 var userTickerIDs map[string]map[string]string
+var token string
 
 // daily amount
 
-// DailyAmount .
-func DailyAmount(w http.ResponseWriter, r *http.Request) {
+// DailyCron .
+func DailyCron(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var response = make(map[string]interface{})
 	response["meta"] = setMeta(statusCodeOk, "ok", "")
 
-	go func() {
-		dailyAmountGetUserIDs()
-		dailyAmountGetTickerIDs()
-		dailyAmountGetUserTickerIDs()
-		dailyAmountGetTickerDetails()
-		dailyAmountCalculate()
-	}()
+	if strings.EqualFold(r.Header.Get("apikey"), cron) {
+		token = r.FormValue("token")
+		go func() {
+			// remove expired
+			removeExpiredGetExpiredPostions()
+			removeExpiredGetTickerDetails()
+			removeExpiredCalculate()
+
+			// daily amount
+			dailyAmountGetUserIDs()
+			dailyAmountGetTickerIDs()
+			dailyAmountGetUserTickerIDs()
+			dailyAmountGetTickerDetails()
+			dailyAmountCalculate()
+		}()
+	}
 
 	w.WriteHeader(getHTTPStatusCode(response["meta"].(map[string]string)["status"]))
 	json.NewEncoder(w).Encode(response)
@@ -116,7 +127,7 @@ func dailyAmountGetTickerDetails() {
 func dailyAmountParseTickerDetails(url string) {
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Add("X-Kite-Version", "3")
-	req.Header.Add("Authorization", "token cu50ienpvww2pb2o:titWqRrkPvkZrWt2bOjzkWmW2ouRmijX")
+	req.Header.Add("Authorization", "token cu50ienpvww2pb2o:"+token)
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -151,23 +162,6 @@ func dailyAmountCalculate() {
 }
 
 // remove expired
-
-// RemoveExpired .
-func RemoveExpired(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	var response = make(map[string]interface{})
-	response["meta"] = setMeta(statusCodeOk, "ok", "")
-
-	go func() {
-		removeExpiredGetExpiredPostions()
-		removeExpiredGetTickerDetails()
-		removeExpiredCalculate()
-	}()
-
-	w.WriteHeader(getHTTPStatusCode(response["meta"].(map[string]string)["status"]))
-	json.NewEncoder(w).Encode(response)
-}
 
 func removeExpiredGetExpiredPostions() {
 	tickerIDsMap = map[string]string{}
@@ -222,7 +216,7 @@ func removeExpiredGetTickerDetails() {
 func removeExpiredParseTickerDetails(url string) {
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Add("X-Kite-Version", "3")
-	req.Header.Add("Authorization", "token cu50ienpvww2pb2o:XnoYIy56Yhpgf9XEfCk2FMM2jQ4LyU3L")
+	req.Header.Add("Authorization", "token cu50ienpvww2pb2o:"+token)
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {

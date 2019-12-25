@@ -60,8 +60,7 @@ func main() {
 	router := mux.NewRouter()
 
 	// cron
-	router.Path("/dailyamount").HandlerFunc(checkHeaders(DailyAmount)).Methods("GET")
-	router.Path("/removeexpired").HandlerFunc(checkHeaders(RemoveExpired)).Methods("GET")
+	router.Path("/dailycron").HandlerFunc(checkHeaders(DailyCron)).Methods("GET")
 
 	router.Path("/account").HandlerFunc(checkHeaders(AccountGet)).Methods("GET")
 	router.Path("/account").HandlerFunc(checkHeaders(AccountAdd)).Methods("POST")
