@@ -68,6 +68,13 @@ func main() {
 		"user_id", "{user_id}",
 	).HandlerFunc(checkHeaders(AccountUpdate)).Methods("PUT")
 
+	router.Path("/amount").HandlerFunc(checkHeaders(AmountGet)).Methods("GET")
+	router.Path("/amount").HandlerFunc(checkHeaders(AmountAdd)).Methods("POST")
+	router.Path("/amount").Queries(
+		"user_id", "{user_id}",
+		"date", "{date}",
+	).HandlerFunc(checkHeaders(AmountUpdate)).Methods("PUT")
+
 	router.Path("/buysell").HandlerFunc(checkHeaders(BuySellAdd)).Methods("POST")
 
 	router.Path("/timing").HandlerFunc(TimingGet).Methods("GET")
