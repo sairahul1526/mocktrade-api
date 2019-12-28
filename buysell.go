@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -31,12 +30,17 @@ func BuySellAdd(w http.ResponseWriter, r *http.Request) {
 	body["status"] = "1"
 	body["created_date_time"] = time.Now().String()
 
+	tx, err := db.Begin()
+	if err != nil {
+		SetReponseStatus(w, r, statusCodeBadRequest, "Order not placed", dialogType, response)
+		return
+	}
 	if strings.EqualFold(body["type"], "1") {
 		amountData, _, _ := selectProcess("select amount from " + accountTable + " where user_id = '" + body["user_id"] + "'")
 		amount, _ := strconv.ParseFloat(amountData[0]["amount"], 64)
 		invested, _ := strconv.ParseFloat(body["invested"], 64)
 		if amount >= invested {
-			db.Exec(buildInsertStatement(positionTable, map[string]string{
+			_, err = tx.Exec(buildInsertStatement(positionTable, map[string]string{
 				"user_id":           body["user_id"],
 				"ticker":            body["ticker"],
 				"name":              body["name"],
@@ -47,9 +51,24 @@ func BuySellAdd(w http.ResponseWriter, r *http.Request) {
 				"created_date_time": body["created_date_time"],
 			}) + " on duplicate key update invested = invested + " + body["invested"] +
 				", shares = shares + " + body["shares"] + ", modified_date_time = '" + body["created_date_time"] + "'")
-			db.Exec("update " + accountTable + " set amount = amount - " + body["invested"] + ", modified_date_time = '" + body["created_date_time"] + "' where user_id = '" + body["user_id"] + "'")
+			if err != nil {
+				tx.Rollback()
+				SetReponseStatus(w, r, statusCodeBadRequest, "Order not placed", dialogType, response)
+				return
+			}
+			_, err = tx.Exec("update " + accountTable + " set amount = amount - " + body["invested"] + ", modified_date_time = '" + body["created_date_time"] + "' where user_id = '" + body["user_id"] + "'")
+			if err != nil {
+				tx.Rollback()
+				SetReponseStatus(w, r, statusCodeBadRequest, "Order not placed", dialogType, response)
+				return
+			}
 			delete(body, "expiry")
-			insertSQL(orderTable, body)
+			_, err = tx.Exec(buildInsertStatement(orderTable, body))
+			if err != nil {
+				tx.Rollback()
+				SetReponseStatus(w, r, statusCodeBadRequest, "Order not placed", dialogType, response)
+				return
+			}
 			response["meta"] = setMeta(statusCodeOk, "Order complete", "")
 		} else {
 			response["meta"] = setMeta(statusCodeBadRequest, "Insufficient funds. Amount required is "+body["invested"]+", but available amount is "+amountData[0]["amount"], dialogType)
@@ -59,7 +78,7 @@ func BuySellAdd(w http.ResponseWriter, r *http.Request) {
 		sharesAvailable, _ := strconv.ParseFloat(positionData[0]["shares"], 64)
 		sharesToSell, _ := strconv.ParseFloat(body["shares"], 64)
 		if sharesAvailable > sharesToSell {
-			db.Exec(buildInsertStatement(positionTable, map[string]string{
+			_, err = tx.Exec(buildInsertStatement(positionTable, map[string]string{
 				"user_id":           body["user_id"],
 				"ticker":            body["ticker"],
 				"name":              body["name"],
@@ -70,19 +89,55 @@ func BuySellAdd(w http.ResponseWriter, r *http.Request) {
 				"created_date_time": body["created_date_time"],
 			}) + " on duplicate key update invested = invested - " + body["invested"] +
 				", shares = shares - " + body["shares"] + ", modified_date_time = '" + body["created_date_time"] + "'")
-			db.Exec("update " + accountTable + " set amount = amount + " + body["invested"] + ", modified_date_time = '" + body["created_date_time"] + "' where user_id = '" + body["user_id"] + "'")
+			if err != nil {
+				tx.Rollback()
+				SetReponseStatus(w, r, statusCodeBadRequest, "Order not placed", dialogType, response)
+				return
+			}
+			_, err = tx.Exec("update " + accountTable + " set amount = amount + " + body["invested"] + ", modified_date_time = '" + body["created_date_time"] + "' where user_id = '" + body["user_id"] + "'")
+			if err != nil {
+				tx.Rollback()
+				SetReponseStatus(w, r, statusCodeBadRequest, "Order not placed", dialogType, response)
+				return
+			}
 			delete(body, "expiry")
-			insertSQL(orderTable, body)
+			_, err = tx.Exec(buildInsertStatement(orderTable, body))
+			if err != nil {
+				tx.Rollback()
+				SetReponseStatus(w, r, statusCodeBadRequest, "Order not placed", dialogType, response)
+				return
+			}
 			response["meta"] = setMeta(statusCodeOk, "Order complete", "")
 		} else if sharesAvailable == sharesToSell {
-			deleteSQL(positionTable, url.Values{"user_id": {body["user_id"]}, "ticker": {body["ticker"]}})
-			db.Exec("update " + accountTable + " set amount = amount + " + body["invested"] + ", modified_date_time = '" + body["created_date_time"] + "' where user_id = '" + body["user_id"] + "'")
+			_, err = tx.Exec("delete from " + positionTable + " where user_id = '" + body["user_id"] + "' and ticker = '" + body["ticker"] + "'")
+			if err != nil {
+				tx.Rollback()
+				SetReponseStatus(w, r, statusCodeBadRequest, "Order not placed", dialogType, response)
+				return
+			}
+			_, err = tx.Exec("update " + accountTable + " set amount = amount + " + body["invested"] + ", modified_date_time = '" + body["created_date_time"] + "' where user_id = '" + body["user_id"] + "'")
+			if err != nil {
+				tx.Rollback()
+				SetReponseStatus(w, r, statusCodeBadRequest, "Order not placed", dialogType, response)
+				return
+			}
 			delete(body, "expiry")
-			insertSQL(orderTable, body)
+			_, err = tx.Exec(buildInsertStatement(orderTable, body))
+			if err != nil {
+				tx.Rollback()
+				SetReponseStatus(w, r, statusCodeBadRequest, "Order not placed", dialogType, response)
+				return
+			}
 			response["meta"] = setMeta(statusCodeOk, "Order complete", "")
 		} else {
 			response["meta"] = setMeta(statusCodeBadRequest, "Insufficient holdings. Only "+positionData[0]["shares"]+" available to sell", dialogType)
 		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		SetReponseStatus(w, r, statusCodeBadRequest, "Order not placed", dialogType, response)
+		return
 	}
 
 	w.Header().Set("Status", response["meta"].(map[string]string)["status"])
