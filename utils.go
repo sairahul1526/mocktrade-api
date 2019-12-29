@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyz0123456789"
@@ -118,4 +119,36 @@ func RandStringBytes(n int) string {
 		b[i] = letterBytes[rand.Intn(len(letterBytes))]
 	}
 	return string(b)
+}
+
+func isMarketOpen() bool {
+	now := time.Now()
+	var (
+		openTime  string
+		closeTime string
+		holiday   string
+	)
+	db.QueryRow("select open, close, holiday from "+timingTable+" where day = '"+openTime+"'").Scan(&openTime, &closeTime, &holiday)
+	if len(openTime) == 0 {
+		return false
+	}
+	if strings.EqualFold(holiday, "1") {
+		return false
+	}
+	openArr := strings.Split(openTime, ":")
+	closeArr := strings.Split(closeTime, ":")
+	hour, _ := strconv.Atoi(openArr[0])
+	min, _ := strconv.Atoi(openArr[1])
+	open := time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, time.Local).Add(-330 * time.Minute)
+	if time.Since(open) < 0 {
+		return false
+	}
+
+	hour, _ = strconv.Atoi(closeArr[0])
+	min, _ = strconv.Atoi(closeArr[1])
+	close := time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, time.Local).Add(-330 * time.Minute)
+	if time.Since(close) > 0 {
+		return false
+	}
+	return true
 }

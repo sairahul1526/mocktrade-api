@@ -27,6 +27,11 @@ func BuySellAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !isMarketOpen() {
+		SetReponseStatus(w, r, statusCodeBadRequest, "Order was placed outside of trading hours.", dialogType, response)
+		return
+	}
+
 	body["status"] = "1"
 	body["created_date_time"] = time.Now().String()
 
