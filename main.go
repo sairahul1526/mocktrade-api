@@ -42,6 +42,7 @@ func inits() {
 
 func main() {
 
+	mumbai, _ = time.LoadLocation("Asia/Kolkata")
 	if len(os.Getenv("dbConfig")) > 0 {
 		dbConfig = os.Getenv("dbConfig")
 	}

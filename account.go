@@ -118,7 +118,7 @@ func AccountAdd(w http.ResponseWriter, r *http.Request) {
 	}
 
 	body["status"] = "1"
-	body["created_date_time"] = time.Now().String()
+	body["created_date_time"] = time.Now().In(mumbai).String()
 
 	status, ok := insertSQL(accountTable, body)
 	w.Header().Set("Status", status)
@@ -159,7 +159,7 @@ func AccountUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	body["modified_date_time"] = time.Now().String()
+	body["modified_date_time"] = time.Now().In(mumbai).String()
 
 	status, ok := updateSQL(accountTable, r.URL.Query(), body)
 	w.Header().Set("Status", status)

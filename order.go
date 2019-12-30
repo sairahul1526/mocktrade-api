@@ -122,7 +122,7 @@ func OrderAdd(w http.ResponseWriter, r *http.Request) {
 	}
 
 	body["status"] = "1"
-	body["created_date_time"] = time.Now().String()
+	body["created_date_time"] = time.Now().In(mumbai).String()
 
 	status, ok := insertSQL(orderTable, body)
 	w.Header().Set("Status", status)
@@ -163,7 +163,7 @@ func OrderUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	body["modified_date_time"] = time.Now().String()
+	body["modified_date_time"] = time.Now().In(mumbai).String()
 
 	status, ok := updateSQL(orderTable, r.URL.Query(), body)
 	w.Header().Set("Status", status)

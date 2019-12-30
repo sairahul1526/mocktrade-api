@@ -123,7 +123,7 @@ func AmountAdd(w http.ResponseWriter, r *http.Request) {
 	}
 
 	body["status"] = "1"
-	body["created_date_time"] = time.Now().String()
+	body["created_date_time"] = time.Now().In(mumbai).String()
 
 	status, ok := insertSQL(amountTable, body)
 	w.Header().Set("Status", status)
@@ -164,7 +164,7 @@ func AmountUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	body["modified_date_time"] = time.Now().String()
+	body["modified_date_time"] = time.Now().In(mumbai).String()
 
 	status, ok := updateSQL(amountTable, r.URL.Query(), body)
 	w.Header().Set("Status", status)

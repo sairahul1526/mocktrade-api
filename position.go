@@ -118,7 +118,7 @@ func PositionAdd(w http.ResponseWriter, r *http.Request) {
 	}
 
 	body["status"] = "1"
-	body["created_date_time"] = time.Now().String()
+	body["created_date_time"] = time.Now().In(mumbai).String()
 
 	status, ok := insertSQL(positionTable, body)
 	w.Header().Set("Status", status)
@@ -159,7 +159,7 @@ func PositionUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	body["modified_date_time"] = time.Now().String()
+	body["modified_date_time"] = time.Now().In(mumbai).String()
 
 	status, ok := updateSQL(positionTable, r.URL.Query(), body)
 	w.Header().Set("Status", status)

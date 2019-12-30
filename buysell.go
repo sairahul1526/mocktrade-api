@@ -33,7 +33,7 @@ func BuySellAdd(w http.ResponseWriter, r *http.Request) {
 	}
 
 	body["status"] = "1"
-	body["created_date_time"] = time.Now().String()
+	body["created_date_time"] = time.Now().In(mumbai).String()
 
 	tx, err := db.Begin()
 	if err != nil {
