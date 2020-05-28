@@ -14,7 +14,7 @@ var userIDs map[string]string
 var positions map[string]map[string]string
 var tickerIDs []string
 var tickerIDsMap map[string]string
-var tickers map[string]float64
+var tickersCron map[string]float64
 var userTickerIDs map[string]map[string]string
 var token string
 
@@ -103,7 +103,7 @@ func dailyAmountGetUserTickerIDs() {
 }
 
 func dailyAmountGetTickerDetails() {
-	tickers = map[string]float64{}
+	tickersCron = map[string]float64{}
 	i := 0
 	url := "https://api.kite.trade/quote/ltp?"
 	init := true
@@ -141,7 +141,7 @@ func dailyAmountParseTickerDetails(url string) {
 	json.Unmarshal(body, &tickerQuotes)
 
 	for _, ticker := range tickerIDs {
-		tickers[ticker] = tickerQuotes.Data[ticker].Price
+		tickersCron[ticker] = tickerQuotes.Data[ticker].Price
 	}
 }
 
@@ -151,7 +151,7 @@ func dailyAmountCalculate() {
 		total, _ = strconv.ParseFloat(amount, 64)
 		for ticker, shares := range userTickerIDs[userID] {
 			no, _ := strconv.ParseFloat(shares, 64)
-			total += tickers[ticker] * no
+			total += tickersCron[ticker] * no
 		}
 		db.Exec(buildInsertStatement(amountTable, map[string]string{
 			"user_id": userID,
@@ -192,7 +192,7 @@ func removeExpiredGetExpiredPostions() {
 }
 
 func removeExpiredGetTickerDetails() {
-	tickers = map[string]float64{}
+	tickersCron = map[string]float64{}
 	i := 0
 	url := "https://api.kite.trade/quote/ltp?"
 	init := true
@@ -230,7 +230,7 @@ func removeExpiredParseTickerDetails(url string) {
 	json.Unmarshal(body, &tickerQuotes)
 
 	for _, ticker := range tickerIDs {
-		tickers[ticker] = tickerQuotes.Data[ticker].Price
+		tickersCron[ticker] = tickerQuotes.Data[ticker].Price
 	}
 }
 
@@ -238,7 +238,7 @@ func removeExpiredCalculate() {
 	for userID, position := range positions {
 		for ticker, shares := range position {
 			no, _ := strconv.ParseFloat(shares, 64)
-			amount := no * tickers[ticker]
+			amount := no * tickersCron[ticker]
 			db.Exec("update " + accountTable + " set amount = amount + " + strconv.FormatFloat(amount, 'f', 2, 64) + " where user_id = '" + userID + "'")
 			deleteSQL(positionTable, url.Values{"user_id": {userID}, "ticker": {ticker}})
 		}

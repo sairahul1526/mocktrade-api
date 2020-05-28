@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -11,12 +12,16 @@ import (
 	"strconv"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/go-redis/redis/v8"
+	_ "github.com/go-sql-driver/mysql" // for mysql
 	"github.com/gorilla/mux"
 )
 
 var db *sql.DB
 var err error
+
+var ctx = context.Background()
+var redisClient *redis.Client
 
 // HealthCheck .
 func HealthCheck(w http.ResponseWriter, r *http.Request) {
@@ -31,12 +36,20 @@ func connectDatabase() {
 	db.SetMaxOpenConns(connectionPool)
 	db.SetMaxIdleConns(connectionPool)
 	db.SetConnMaxLifetime(time.Hour)
+
+	redisClient = redis.NewClient(&redis.Options{
+		Addr:     "127.0.0.1:6379",
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
+	ctx = redisClient.Context()
+	pong, err := redisClient.Ping(ctx).Result()
+	fmt.Println(pong, err)
+
 }
 
 func inits() {
-
 	rand.Seed(time.Now().UnixNano())
-
 	connectDatabase()
 }
 
@@ -55,21 +68,35 @@ func main() {
 	if len(os.Getenv("migrate")) > 0 {
 		migrate, _ = strconv.ParseBool(os.Getenv("migrate"))
 	}
+	if len(os.Getenv("accessToken")) > 0 {
+		accessToken = os.Getenv("accessToken")
+	}
+
+	// defer profile.Start().Stop()
+	// defer profile.Start(profile.MemProfile).Stop()
+	// go tool pprof --pdf main /var/folders/k6/0m4k5qg110jgfzpfdrdjv1dr0000gn/T/profile113169278/cpu.pprof > pprofs/file17.pdf
 
 	inits()
 	defer db.Close()
+	defer redisClient.Close()
 	router := mux.NewRouter()
+
+	go connectToKite()
 
 	// cron
 	router.Path("/dailycron").HandlerFunc(checkHeaders(DailyCron)).Methods("GET")
 
-	router.Path("/account").HandlerFunc(checkHeaders(AccountGet)).Methods("GET")
+	router.Path("/account").Queries(
+		"user_id", "{user_id}",
+	).HandlerFunc(checkHeaders(AccountGet)).Methods("GET")
 	router.Path("/account").HandlerFunc(checkHeaders(AccountAdd)).Methods("POST")
 	router.Path("/account").Queries(
 		"user_id", "{user_id}",
 	).HandlerFunc(checkHeaders(AccountUpdate)).Methods("PUT")
 
-	router.Path("/amount").HandlerFunc(checkHeaders(AmountGet)).Methods("GET")
+	router.Path("/amount").Queries(
+		"user_id", "{user_id}",
+	).HandlerFunc(checkHeaders(AmountGet)).Methods("GET")
 	router.Path("/amount").HandlerFunc(checkHeaders(AmountAdd)).Methods("POST")
 	router.Path("/amount").Queries(
 		"user_id", "{user_id}",
@@ -84,22 +111,38 @@ func main() {
 		"day", "{day}",
 	).HandlerFunc(checkHeaders(TimingUpdate)).Methods("PUT")
 
-	router.Path("/order").HandlerFunc(checkHeaders(OrderGet)).Methods("GET")
+	router.Path("/order").Queries(
+		"user_id", "{user_id}",
+	).HandlerFunc(checkHeaders(OrderGet)).Methods("GET")
 	router.Path("/order").HandlerFunc(checkHeaders(OrderAdd)).Methods("POST")
 	router.Path("/order").Queries(
 		"user_id", "{user_id}",
 	).HandlerFunc(checkHeaders(OrderUpdate)).Methods("PUT")
 
-	router.Path("/position").HandlerFunc(checkHeaders(PositionGet)).Methods("GET")
+	router.Path("/position").Queries(
+		"user_id", "{user_id}",
+	).HandlerFunc(checkHeaders(PositionGet)).Methods("GET")
 	router.Path("/position").HandlerFunc(checkHeaders(PositionAdd)).Methods("POST")
 	router.Path("/position").Queries(
 		"user_id", "{user_id}",
 	).HandlerFunc(checkHeaders(PositionUpdate)).Methods("PUT")
 
-	router.Path("/ticker").HandlerFunc(TickerGet).Methods("GET")
+	router.Path("/ticker").HandlerFunc(checkHeaders(TickerGet)).Methods("GET")
+	router.Path("/tickerclose").HandlerFunc(checkHeaders(TickerCloseGet)).Methods("GET")
+
+	router.Path("/realtime").Queries(
+		"tickers", "{tickers}",
+	).HandlerFunc(wsHandler).Methods("GET")
 
 	router.Path("/login").HandlerFunc(Login).Methods("GET")
 	router.Path("/token").HandlerFunc(Token).Methods("GET")
+	router.Path("/token").Queries(
+		"token", "{token}",
+	).HandlerFunc(TokenUpdate).Methods("PUT")
+
+	router.Path("/sendemailotp").HandlerFunc(checkHeaders(SendEmailOTP)).Methods("POST")
+	router.Path("/verifyemailotp").HandlerFunc(checkHeaders(VerifyEmailOTP)).Methods("POST")
+
 	router.Path("/").HandlerFunc(HealthCheck).Methods("GET")
 
 	fmt.Println(http.ListenAndServe(":5000", &WithCORS{router}))
@@ -113,8 +156,8 @@ type WithCORS struct {
 func (s *WithCORS) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 	res.Header().Set("Access-Control-Allow-Origin", "*")
-	res.Header().Set("Access-Control-Allow-Methods", "GET,OPTIONS,POST,PUT,DELETE")
-	res.Header().Set("Access-Control-Allow-Headers", "Content-Type,api_key,appversion")
+	res.Header().Set("Access-Control-Allow-Methods", "*")
+	res.Header().Set("Access-Control-Allow-Headers", "*")
 
 	// Stop here for a Preflighted OPTIONS request.
 	if req.Method == "OPTIONS" {

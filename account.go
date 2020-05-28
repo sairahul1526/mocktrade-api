@@ -120,10 +120,19 @@ func AccountAdd(w http.ResponseWriter, r *http.Request) {
 	body["status"] = "1"
 	body["created_date_time"] = time.Now().In(mumbai).String()
 
-	status, ok := insertSQL(accountTable, body)
+	var status string
+	var ok bool
+	for true {
+		body["user_id"] = RandStringBytes(6)
+		status, ok = insertSQL(accountTable, body)
+		if !strings.EqualFold(status, statusCodeDuplicateEntry) {
+			break
+		}
+	}
 	w.Header().Set("Status", status)
 	if ok {
-		response["meta"] = setMeta(status, "Account added", "")
+		response["user_id"] = body["user_id"]
+		response["meta"] = setMeta(status, "Account added", dialogType)
 	} else {
 		response["meta"] = setMeta(status, "", dialogType)
 	}

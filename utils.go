@@ -8,6 +8,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	kiteconnect "github.com/zerodhatech/gokiteconnect"
+	gomail "gopkg.in/gomail.v2"
 )
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyz0123456789"
@@ -25,6 +28,53 @@ func requiredFiledsCheck(body map[string]string, required []string) string {
 		}
 	}
 	return ""
+}
+
+func getTickers() []map[string]string {
+	tickers := []map[string]string{}
+
+	value := getValueRedis("tickers")
+	if len(value) > 0 {
+		err := json.Unmarshal([]byte(value), &tickers)
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			fmt.Println("from cache")
+			return tickers
+		}
+	}
+
+	kiteclient := kiteconnect.New(apiKey)
+	instruments, err := kiteclient.GetInstrumentsByExchange("NSE")
+	if err != nil {
+		fmt.Println("getTickers", err)
+		return []map[string]string{}
+	}
+
+	for _, instrument := range instruments {
+		tickers = append(tickers, map[string]string{
+			"i":   strconv.Itoa(instrument.InstrumentToken),
+			"e":   strconv.Itoa(instrument.ExchangeToken),
+			"t":   instrument.Tradingsymbol,
+			"n":   instrument.Name,
+			"ex":  instrument.Expiry.String(),
+			"s":   strconv.FormatFloat(instrument.StrikePrice, 'f', 2, 64),
+			"ti":  strconv.FormatFloat(instrument.TickSize, 'f', 2, 64),
+			"l":   strconv.FormatFloat(instrument.LotSize, 'f', 2, 64),
+			"in":  instrument.InstrumentType,
+			"se":  instrument.Segment,
+			"exc": instrument.Exchange,
+		})
+	}
+
+	body, err := json.Marshal(tickers)
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		setValueRedisWithExpiration("tickers", string(body), 15*time.Minute)
+	}
+
+	return tickers
 }
 
 func sqlErrorCheck(code uint16) string {
@@ -122,13 +172,14 @@ func RandStringBytes(n int) string {
 }
 
 func isMarketOpen() bool {
-	now := time.Now()
+	now := time.Now().UTC()
 	var (
 		openTime  string
 		closeTime string
 		holiday   string
 	)
-	db.QueryRow("select open, close, holiday from "+timingTable+" where day = '"+openTime+"'").Scan(&openTime, &closeTime, &holiday)
+	db.QueryRow("select open, close, holiday from "+timingTable+" where day = '"+strconv.Itoa(int(now.Weekday()))+"'").Scan(&openTime, &closeTime, &holiday)
+
 	if len(openTime) == 0 {
 		return false
 	}
@@ -139,16 +190,64 @@ func isMarketOpen() bool {
 	closeArr := strings.Split(closeTime, ":")
 	hour, _ := strconv.Atoi(openArr[0])
 	min, _ := strconv.Atoi(openArr[1])
-	open := time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, time.Local).Add(-330 * time.Minute)
-	if time.Since(open) < 0 {
+	open := time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, time.UTC).Add(-330 * time.Minute)
+	if time.Now().UTC().Before(open) {
 		return false
 	}
 
 	hour, _ = strconv.Atoi(closeArr[0])
 	min, _ = strconv.Atoi(closeArr[1])
-	close := time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, time.Local).Add(-330 * time.Minute)
-	if time.Since(close) > 0 {
+	close := time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, time.UTC).Add(-330 * time.Minute)
+	if time.Now().UTC().After(close) {
 		return false
 	}
 	return true
+}
+
+func setValueRedis(key, value string) {
+	redisClient.Set(ctx, key, value, 0)
+}
+
+func setValueRedisWithExpiration(key, value string, d time.Duration) {
+	redisClient.Set(ctx, key, value, d)
+}
+
+func setValuesRedis(keyValues map[string]string) {
+	redisClient.MSet(ctx, keyValues, 0)
+}
+
+func getValueRedis(key string) string {
+	val, _ := redisClient.Get(ctx, key).Result()
+	return val
+}
+
+func getValuesRedis(keys []string) []interface{} {
+	val, _ := redisClient.MGet(ctx, keys...).Result()
+	return val
+}
+
+// defer measureTime("expensivePrint")()
+// To log code latency
+func measureTime(funcName string) func() {
+	start := time.Now()
+	return func() {
+		fmt.Printf("Time taken by %s function is %v \n", funcName, time.Since(start))
+	}
+}
+
+func mail(to, title, body string) {
+	fmt.Println("mail", to, title, body)
+	m := gomail.NewMessage()
+	m.SetHeader("From", "rahul.mocktrade@gmail.com")
+	m.SetHeader("To", "rahul.mocktrade@gmail.com")
+
+	m.SetHeader("Bcc", to)
+	m.SetHeader("Subject", title)
+	m.SetBody("text/html", body)
+
+	d := gomail.NewDialer("smtp.gmail.com", 587, "rahul.mocktrade@gmail.com", "Gmail9848$")
+
+	if err := d.DialAndSend(m); err != nil {
+		fmt.Println("mail", to, err)
+	}
 }
