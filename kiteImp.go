@@ -42,7 +42,7 @@ func onTick(tick kiteticker.Tick) {
 
 // Triggered when reconnection is attempted which is enabled by default
 func onReconnect(attempt int, delay time.Duration) {
-	mail("dravid.rahul1526@gmail.com", "Kite Reconnect - Mock Trade", "")
+	mail("dravid.rahul1526@gmail.com", "Kite Reconnect - Mock Trade", "attempt - "+strconv.Itoa(attempt))
 	fmt.Println("Reconnect attempt ", attempt, " in ", delay.Seconds())
 }
 
