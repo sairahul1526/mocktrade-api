@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 // TickerGet .
@@ -28,11 +29,22 @@ func TickerCloseGet(w http.ResponseWriter, r *http.Request) {
 	var response = make(map[string]interface{})
 
 	data := []map[string]string{}
+	tokensClose := []string{}
 	for _, token := range tokens {
-		data = append(data, map[string]string{
-			"k": strconv.Itoa(int(token)),
-			"v": getValueRedis(strconv.Itoa(int(token)) + "_close"),
-		})
+		tokensClose = append(tokensClose, strconv.Itoa(int(token))+"_close")
+	}
+	closes := getValuesRedis(tokensClose)
+	temp := []string{}
+	for _, close := range closes {
+		if close != nil {
+			temp = strings.Split(close.(string), ":")
+			if len(temp) > 1 {
+				data = append(data, map[string]string{
+					"k": temp[0],
+					"v": close.(string),
+				})
+			}
+		}
 	}
 	response["data"] = data
 	response["meta"] = setMeta(statusCodeOk, "", "")
