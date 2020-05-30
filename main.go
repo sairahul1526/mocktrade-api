@@ -68,9 +68,6 @@ func main() {
 	if len(os.Getenv("migrate")) > 0 {
 		migrate, _ = strconv.ParseBool(os.Getenv("migrate"))
 	}
-	if len(os.Getenv("accessToken")) > 0 {
-		accessToken = os.Getenv("accessToken")
-	}
 
 	// defer profile.Start().Stop()
 	// defer profile.Start(profile.MemProfile).Stop()
@@ -80,6 +77,10 @@ func main() {
 	defer db.Close()
 	defer redisClient.Close()
 	router := mux.NewRouter()
+
+	if len(getValueRedis("accessToken")) > 0 {
+		accessToken = getValueRedis("accessToken")
+	}
 
 	go connectToKite()
 
@@ -97,35 +98,18 @@ func main() {
 	router.Path("/amount").Queries(
 		"user_id", "{user_id}",
 	).HandlerFunc(checkHeaders(AmountGet)).Methods("GET")
-	router.Path("/amount").HandlerFunc(checkHeaders(AmountAdd)).Methods("POST")
-	router.Path("/amount").Queries(
-		"user_id", "{user_id}",
-		"date", "{date}",
-	).HandlerFunc(checkHeaders(AmountUpdate)).Methods("PUT")
 
 	router.Path("/buysell").HandlerFunc(checkHeaders(BuySellAdd)).Methods("POST")
 
 	router.Path("/timing").HandlerFunc(TimingGet).Methods("GET")
-	router.Path("/timing").HandlerFunc(checkHeaders(TimingAdd)).Methods("POST")
-	router.Path("/timing").Queries(
-		"day", "{day}",
-	).HandlerFunc(checkHeaders(TimingUpdate)).Methods("PUT")
 
 	router.Path("/order").Queries(
 		"user_id", "{user_id}",
 	).HandlerFunc(checkHeaders(OrderGet)).Methods("GET")
-	router.Path("/order").HandlerFunc(checkHeaders(OrderAdd)).Methods("POST")
-	router.Path("/order").Queries(
-		"user_id", "{user_id}",
-	).HandlerFunc(checkHeaders(OrderUpdate)).Methods("PUT")
 
 	router.Path("/position").Queries(
 		"user_id", "{user_id}",
 	).HandlerFunc(checkHeaders(PositionGet)).Methods("GET")
-	router.Path("/position").HandlerFunc(checkHeaders(PositionAdd)).Methods("POST")
-	router.Path("/position").Queries(
-		"user_id", "{user_id}",
-	).HandlerFunc(checkHeaders(PositionUpdate)).Methods("PUT")
 
 	router.Path("/ticker").HandlerFunc(checkHeaders(TickerGet)).Methods("GET")
 	router.Path("/tickerclose").HandlerFunc(checkHeaders(TickerCloseGet)).Methods("GET")

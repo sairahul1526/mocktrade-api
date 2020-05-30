@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"time"
 
 	kiteconnect "github.com/zerodhatech/gokiteconnect"
 )
@@ -32,14 +33,20 @@ func Token(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+func closeApplication() {
+	time.Sleep(2 * time.Second)
+	os.Exit(3)
+}
+
 // TokenUpdate .
 func TokenUpdate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var response = make(map[string]interface{})
 
-	os.Setenv("accessToken", r.FormValue("token"))
-	os.Exit(3)
+	setValueRedis("accessToken", r.FormValue("token"))
+
+	go closeApplication()
 
 	response["meta"] = setMeta(statusCodeOk, "ok", "")
 	w.WriteHeader(getHTTPStatusCode(response["meta"].(map[string]string)["status"]))
