@@ -112,7 +112,6 @@ func main() {
 	).HandlerFunc(checkHeaders(PositionGet)).Methods("GET")
 
 	router.Path("/ticker").HandlerFunc(checkHeaders(TickerGet)).Methods("GET")
-	router.Path("/tickerclose").HandlerFunc(checkHeaders(TickerCloseGet)).Methods("GET")
 
 	router.Path("/realtime").Queries(
 		"tickers", "{tickers}",
