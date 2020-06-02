@@ -147,7 +147,7 @@ func BuySellAdd(w http.ResponseWriter, r *http.Request) {
 			}
 			response["price"] = body["price"]
 			response["invested"] = body["invested"]
-			response["created_date_time"] = body["created_date_time"]
+			response["created_date_time"] = time.Now().In(mumbai).Format("2006-01-02 15:04:05")
 		} else {
 			response["meta"] = setMeta(statusCodeBadRequest, "Stock not available for transaction", dialogType)
 		}
