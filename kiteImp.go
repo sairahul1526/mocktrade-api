@@ -36,8 +36,7 @@ func onConnect() {
 
 // Triggered when tick is recevived
 func onTick(tick kiteticker.Tick) {
-	setValueRedis(strconv.Itoa(int(tick.InstrumentToken))+"_close", strconv.Itoa(int(tick.InstrumentToken))+":"+strconv.FormatFloat(tick.OHLC.Close, 'f', -1, 64))
-	setValueRedis(strconv.Itoa(int(tick.InstrumentToken))+"_last", strconv.Itoa(int(tick.InstrumentToken))+":"+strconv.FormatFloat(tick.LastPrice, 'f', -1, 64))
+	setValueRedis(strconv.Itoa(int(tick.InstrumentToken)), strconv.Itoa(int(tick.InstrumentToken))+":"+strconv.FormatFloat(tick.LastPrice, 'f', -1, 64)+":"+strconv.FormatFloat(tick.OHLC.Close, 'f', -1, 64))
 }
 
 // Triggered when reconnection is attempted which is enabled by default

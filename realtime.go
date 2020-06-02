@@ -20,10 +20,6 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 
 	stocks := strings.Split(r.FormValue("tickers"), ",")
 
-	for i := 0; i < len(stocks); i++ {
-		stocks[i] = stocks[i] + "_last"
-	}
-
 	fmt.Println(stocks)
 
 	ticker := time.NewTicker(time.Second)
