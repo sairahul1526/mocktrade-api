@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -12,8 +11,6 @@ import (
 
 var userIDs map[string]string
 var positions map[string]map[string]string
-var tickerIDs []string
-var tickerIDsMap map[string]string
 var tickersCron map[string]float64
 var userTickerIDs map[string]map[string]string
 var token string
@@ -32,14 +29,11 @@ func DailyCron(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			// remove expired
 			removeExpiredGetExpiredPostions()
-			removeExpiredGetTickerDetails()
 			removeExpiredCalculate()
 
 			// daily amount
 			dailyAmountGetUserIDs()
-			dailyAmountGetTickerIDs()
 			dailyAmountGetUserTickerIDs()
-			dailyAmountGetTickerDetails()
 			dailyAmountCalculate()
 		}()
 	}
@@ -65,22 +59,6 @@ func dailyAmountGetUserIDs() {
 	}
 }
 
-func dailyAmountGetTickerIDs() {
-	tickerIDs = []string{}
-	rows, err := db.Query("select ticker from " + positionTable + " group by ticker")
-	if err != nil {
-		return
-	}
-
-	var (
-		tickerID string
-	)
-	for rows.Next() {
-		rows.Scan(&tickerID)
-		tickerIDs = append(tickerIDs, tickerID)
-	}
-}
-
 func dailyAmountGetUserTickerIDs() {
 	userTickerIDs = map[string]map[string]string{}
 	rows, err := db.Query("select user_id, ticker, shares from " + positionTable + " order by user_id")
@@ -102,61 +80,22 @@ func dailyAmountGetUserTickerIDs() {
 	}
 }
 
-func dailyAmountGetTickerDetails() {
-	tickersCron = map[string]float64{}
-	i := 0
-	url := "https://api.kite.trade/quote/ltp?"
-	init := true
-	for _, ticker := range tickerIDs {
-		if i > 500 {
-			dailyAmountParseTickerDetails(url)
-			i = 0
-			url = "https://api.kite.trade/quote/ltp?"
-			init = true
-		} else {
-			if !init {
-				url += "&"
-			}
-			url += "i=" + ticker
-			init = false
-		}
-	}
-	dailyAmountParseTickerDetails(url)
-}
-
-func dailyAmountParseTickerDetails(url string) {
-	req, _ := http.NewRequest("GET", url, nil)
-	req.Header.Add("X-Kite-Version", "3")
-	req.Header.Add("Authorization", "token cu50ienpvww2pb2o:"+token)
-
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return
-	}
-
-	defer res.Body.Close()
-	body, _ := ioutil.ReadAll(res.Body)
-
-	tickerQuotes := TickerQuotes{}
-	json.Unmarshal(body, &tickerQuotes)
-
-	for _, ticker := range tickerIDs {
-		tickersCron[ticker] = tickerQuotes.Data[ticker].Price
-	}
-}
-
 func dailyAmountCalculate() {
 	var total float64
 	for userID, amount := range userIDs {
 		total, _ = strconv.ParseFloat(amount, 64)
 		for ticker, shares := range userTickerIDs[userID] {
 			no, _ := strconv.ParseFloat(shares, 64)
-			total += tickersCron[ticker] * no
+			temp := strings.Split(getValueRedis(ticker), ":")
+			if len(temp) > 1 {
+				price, _ := strconv.ParseFloat(temp[1], 64)
+				total += price * no
+			}
 		}
 		db.Exec(buildInsertStatement(amountTable, map[string]string{
 			"user_id": userID,
 			"amount":  strconv.FormatFloat(total, 'f', 2, 64),
-			"date":    time.Now().Format("2006-01-02"),
+			"date":    time.Now().In(mumbai).Format("2006-01-02"),
 		}))
 	}
 }
@@ -164,8 +103,6 @@ func dailyAmountCalculate() {
 // remove expired
 
 func removeExpiredGetExpiredPostions() {
-	tickerIDsMap = map[string]string{}
-	tickerIDs = []string{}
 	positions = map[string]map[string]string{}
 	rows, err := db.Query("select user_id, ticker, shares from " + positionTable + " where expiry is not null and expiry != '' and expiry < '" + time.Now().Format("2006-01-02") + "'")
 	if err != nil {
@@ -182,55 +119,7 @@ func removeExpiredGetExpiredPostions() {
 		if positions[userID] == nil {
 			positions[userID] = map[string]string{}
 		}
-		tickerIDsMap[ticker] = "1"
 		positions[userID][ticker] = shares
-	}
-
-	for key := range tickerIDsMap {
-		tickerIDs = append(tickerIDs, key)
-	}
-}
-
-func removeExpiredGetTickerDetails() {
-	tickersCron = map[string]float64{}
-	i := 0
-	url := "https://api.kite.trade/quote/ltp?"
-	init := true
-	for _, ticker := range tickerIDs {
-		if i > 500 {
-			removeExpiredParseTickerDetails(url)
-			i = 0
-			url = "https://api.kite.trade/quote/ltp?"
-			init = true
-		} else {
-			if !init {
-				url += "&"
-			}
-			url += "i=" + ticker
-			init = false
-		}
-	}
-	removeExpiredParseTickerDetails(url)
-}
-
-func removeExpiredParseTickerDetails(url string) {
-	req, _ := http.NewRequest("GET", url, nil)
-	req.Header.Add("X-Kite-Version", "3")
-	req.Header.Add("Authorization", "token cu50ienpvww2pb2o:"+token)
-
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return
-	}
-
-	defer res.Body.Close()
-	body, _ := ioutil.ReadAll(res.Body)
-
-	tickerQuotes := TickerQuotes{}
-	json.Unmarshal(body, &tickerQuotes)
-
-	for _, ticker := range tickerIDs {
-		tickersCron[ticker] = tickerQuotes.Data[ticker].Price
 	}
 }
 
@@ -238,9 +127,13 @@ func removeExpiredCalculate() {
 	for userID, position := range positions {
 		for ticker, shares := range position {
 			no, _ := strconv.ParseFloat(shares, 64)
-			amount := no * tickersCron[ticker]
-			db.Exec("update " + accountTable + " set amount = amount + " + strconv.FormatFloat(amount, 'f', 2, 64) + " where user_id = '" + userID + "'")
-			deleteSQL(positionTable, url.Values{"user_id": {userID}, "ticker": {ticker}})
+			temp := strings.Split(getValueRedis(ticker), ":")
+			if len(temp) > 1 {
+				price, _ := strconv.ParseFloat(temp[1], 64)
+				amount := no * price
+				db.Exec("update " + accountTable + " set amount = amount + " + strconv.FormatFloat(amount, 'f', 2, 64) + " where user_id = '" + userID + "'")
+				deleteSQL(positionTable, url.Values{"user_id": {userID}, "ticker": {ticker}})
+			}
 		}
 	}
 }
