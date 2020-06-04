@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"strconv"
@@ -57,7 +58,7 @@ func getTickers() []map[string]string {
 			"e":   strconv.Itoa(instrument.ExchangeToken),
 			"t":   instrument.Tradingsymbol,
 			"n":   instrument.Name,
-			"ex":  instrument.Expiry.String(),
+			"ex":  "", // since these are stocks and no expiry
 			"s":   strconv.FormatFloat(instrument.StrikePrice, 'f', 2, 64),
 			"ti":  strconv.FormatFloat(instrument.TickSize, 'f', 2, 64),
 			"l":   strconv.FormatFloat(instrument.LotSize, 'f', 2, 64),
@@ -171,6 +172,12 @@ func RandStringBytes(n int) string {
 	return string(b)
 }
 
+func checkUserID(userID string) bool {
+	var status string
+	db.QueryRow("select status from " + accountTable + " where user_id = '" + userID + "' and status = 1").Scan(&status)
+	return len(status) > 0
+}
+
 func isMarketOpen() bool {
 	now := time.Now().UTC()
 	var (
@@ -224,6 +231,29 @@ func getValueRedis(key string) string {
 func getValuesRedis(keys []string) []interface{} {
 	val, _ := redisClient.MGet(ctx, keys...).Result()
 	return val
+}
+
+func msg91(to, otp string) {
+	url := "https://api.msg91.com/api/v2/sendsms"
+
+	payload := strings.NewReader("{ \"sender\": \"MOCKAP\", \"route\": \"4\", \"country\": \"91\", \"sms\": [ { \"message\": \"" + strings.ReplaceAll(otpMessage, "##OTP##", otp) + "\", \"to\": [ \"" + to + "\"] } ] }")
+
+	req, _ := http.NewRequest("POST", url, payload)
+
+	req.Header.Add("authkey", "331064AVVjQRraN7jt5ed65c82P1")
+	req.Header.Add("content-type", "application/json")
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		fmt.Println("SendOTP", err)
+		return
+	}
+
+	defer res.Body.Close()
+	body, _ := ioutil.ReadAll(res.Body)
+
+	fmt.Println(res)
+	fmt.Println(string(body))
 }
 
 // defer measureTime("expensivePrint")()

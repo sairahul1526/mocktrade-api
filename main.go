@@ -114,14 +114,18 @@ func main() {
 	router.Path("/ticker").HandlerFunc(checkHeaders(TickerGet)).Methods("GET")
 
 	router.Path("/realtime").Queries(
+		"user_id", "{user_id}",
 		"tickers", "{tickers}",
-	).HandlerFunc(wsHandler).Methods("GET")
+	).HandlerFunc(checkHeaders(wsHandler)).Methods("GET")
 
 	router.Path("/login").HandlerFunc(Login).Methods("GET")
 	router.Path("/token").HandlerFunc(Token).Methods("GET")
 	router.Path("/token").Queries(
 		"token", "{token}",
 	).HandlerFunc(TokenUpdate).Methods("PUT")
+
+	router.Path("/sendotp").HandlerFunc(checkHeaders(SendOTP)).Methods("POST")
+	router.Path("/verifyotp").HandlerFunc(checkHeaders(VerifyOTP)).Methods("POST")
 
 	router.Path("/sendemailotp").HandlerFunc(checkHeaders(SendEmailOTP)).Methods("POST")
 	router.Path("/verifyemailotp").HandlerFunc(checkHeaders(VerifyEmailOTP)).Methods("POST")
