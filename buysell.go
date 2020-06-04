@@ -52,16 +52,19 @@ func BuySellAdd(w http.ResponseWriter, r *http.Request) {
 				amount, _ := strconv.ParseFloat(amountData[0]["amount"], 64)
 				invested, _ := strconv.ParseFloat(body["invested"], 64)
 				if amount >= invested {
-					_, err = tx.Exec(buildInsertStatement(positionTable, map[string]string{
+					positionMap := map[string]string{
 						"user_id":           body["user_id"],
 						"ticker":            body["ticker"],
 						"name":              body["name"],
 						"invested":          body["invested"],
 						"shares":            body["shares"],
 						"status":            "1",
-						"expiry":            body["expiry"],
 						"created_date_time": body["created_date_time"],
-					}) + " on duplicate key update invested = invested + " + body["invested"] +
+					}
+					if len(body["expiry"]) > 0 {
+						positionMap["expiry"] = body["expiry"]
+					}
+					_, err = tx.Exec(buildInsertStatement(positionTable, positionMap) + " on duplicate key update invested = invested + " + body["invested"] +
 						", shares = shares + " + body["shares"] + ", modified_date_time = '" + body["created_date_time"] + "'")
 					if err != nil {
 						tx.Rollback()
@@ -90,7 +93,7 @@ func BuySellAdd(w http.ResponseWriter, r *http.Request) {
 				sharesAvailable, _ := strconv.ParseFloat(positionData[0]["shares"], 64)
 				sharesToSell, _ := strconv.ParseFloat(body["shares"], 64)
 				if sharesAvailable > sharesToSell {
-					_, err = tx.Exec(buildInsertStatement(positionTable, map[string]string{
+					positionMap := map[string]string{
 						"user_id":           body["user_id"],
 						"ticker":            body["ticker"],
 						"name":              body["name"],
@@ -99,7 +102,11 @@ func BuySellAdd(w http.ResponseWriter, r *http.Request) {
 						"status":            "1",
 						"expiry":            body["expiry"],
 						"created_date_time": body["created_date_time"],
-					}) + " on duplicate key update invested = invested - " + body["invested"] +
+					}
+					if len(body["expiry"]) > 0 {
+						positionMap["expiry"] = body["expiry"]
+					}
+					_, err = tx.Exec(buildInsertStatement(positionTable, positionMap) + " on duplicate key update invested = invested - " + body["invested"] +
 						", shares = shares - " + body["shares"] + ", modified_date_time = '" + body["created_date_time"] + "'")
 					if err != nil {
 						tx.Rollback()
@@ -164,9 +171,5 @@ func BuySellAdd(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Status", response["meta"].(map[string]string)["status"])
 
 	w.WriteHeader(getHTTPStatusCode(response["meta"].(map[string]string)["status"]))
-	meta, required := checkAppUpdate(r)
-	if required {
-		response["meta"] = meta
-	}
 	json.NewEncoder(w).Encode(response)
 }
