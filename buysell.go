@@ -40,7 +40,7 @@ func BuySellAdd(w http.ResponseWriter, r *http.Request) {
 		SetReponseStatus(w, r, statusCodeBadRequest, "Order not placed", dialogType, response)
 		return
 	}
-	last := strings.Split(getValueRedis(body["ticker"]+"_last"), ":")
+	last := strings.Split(getValueRedis(body["ticker"]), ":")
 	if len(last) > 1 {
 		price, _ := strconv.ParseFloat(last[1], 64)
 		shares, _ := strconv.ParseFloat(body["shares"], 64)
