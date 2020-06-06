@@ -15,7 +15,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("wsHandler", err)
 		return
 	}
-	if checkUserID(r.FormValue("user_id")) {
+	if !checkUserID(r.FormValue("user_id")) {
 		ws.Close()
 		fmt.Println("wsHandler", "User not found", r.FormValue("user_id"))
 		return
@@ -35,21 +35,23 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	if len(r.FormValue("tickers")) > 0 {
-		var send string
+		var send strings.Builder
 		active := true
 		for {
 			if active {
 				select {
 				case t := <-ticker.C:
 					for _, val := range getValuesRedis(stocks) {
-						send += val.(string) + "#"
+						if val != nil {
+							send.WriteString(val.(string) + "#")
+						}
 					}
-					err := ws.WriteMessage(websocket.TextMessage, []byte(send))
+					err := ws.WriteMessage(websocket.TextMessage, []byte(send.String()))
 					if err != nil {
 						fmt.Println("realtime", t, err)
 						active = false
 					}
-					send = ""
+					send.Reset()
 				}
 			} else {
 				break
