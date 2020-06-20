@@ -68,6 +68,7 @@ func main() {
 	if len(os.Getenv("migrate")) > 0 {
 		migrate, _ = strconv.ParseBool(os.Getenv("migrate"))
 	}
+	test = false
 
 	// defer profile.Start().Stop()
 	// defer profile.Start(profile.MemProfile).Stop()
@@ -82,7 +83,10 @@ func main() {
 		accessToken = getValueRedis("accessToken")
 	}
 
+	loadAlerts()
 	go connectToKite()
+	go alertPassed()
+	go sendingAlertNotifications()
 
 	// cron
 	router.Path("/dailycron").HandlerFunc(checkHeaders(DailyCron)).Methods("GET")
@@ -94,6 +98,11 @@ func main() {
 	router.Path("/account").Queries(
 		"user_id", "{user_id}",
 	).HandlerFunc(checkHeaders(AccountUpdate)).Methods("PUT")
+
+	router.Path("/alert").Queries(
+		"user_id", "{user_id}",
+	).HandlerFunc(checkHeaders(AlertGet)).Methods("GET")
+	router.Path("/alert").HandlerFunc(checkHeaders(AlertAdd)).Methods("POST")
 
 	router.Path("/amount").Queries(
 		"user_id", "{user_id}",

@@ -71,6 +71,32 @@ func insertSQL(tableName string, body map[string]string) (string, bool) {
 	return statusCodeCreated, true
 }
 
+func insertSQLWithID(tableName string, body map[string]string) (int64, string, bool) {
+	if len(body) == 0 {
+		return 0, statusCodeBadRequest, false
+	}
+	SQLQuery := buildInsertStatement(tableName, body)
+	logger(SQLQuery)
+
+	resp, err := db.Exec(SQLQuery)
+	if err != nil {
+		fmt.Println("insertSQL", err)
+		if driverErr, ok := err.(*mysql.MySQLError); ok {
+			errCode := sqlErrorCheck(driverErr.Number)
+			if strings.EqualFold(errCode, statusCodeDuplicateEntry) {
+				if strings.Contains(err.Error(), "_u_id") {
+					return 0, statusCodeDuplicateEntry, false
+				}
+				return 0, statusCodeBadRequest, false
+			}
+			return 0, errCode, false
+		}
+		return 0, statusCodeServerError, false // default
+	}
+	id, _ := resp.LastInsertId()
+	return id, statusCodeCreated, true
+}
+
 func buildInsertStatement(tableName string, body map[string]string) string {
 	SQLQuery := "insert into `" + tableName + "` "
 	keys := " ("

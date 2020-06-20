@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -178,6 +179,37 @@ func checkUserID(userID string) bool {
 	return len(status) > 0
 }
 
+func sendNotifications(userID, heading, content string) {
+	data := map[string]interface{}{}
+	data["app_id"] = onesignalAppID
+	data["headings"] = map[string]string{"en": heading}
+	data["contents"] = map[string]string{"en": content}
+	data["filters"] = []map[string]string{
+		map[string]string{
+			"field":    "tag",
+			"key":      "user_id",
+			"relation": "=",
+			"value":    userID,
+		},
+	}
+
+	byteData, _ := json.Marshal(data)
+	req, _ := http.NewRequest("POST", "https://onesignal.com/api/v1/notifications", bytes.NewBuffer(byteData))
+	req.Header.Add("Authorization", "Basic NjVmMjBhZTItNTZjMS00MzUyLTg5MTgtMjZhNmI3ZDk2NDg1")
+	req.Header.Add("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		fmt.Println("sendNotifications", userID, err)
+		return
+	}
+	_, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println("sendNotifications", userID, err)
+		return
+	}
+}
+
 func isMarketOpen() bool {
 	now := time.Now().UTC()
 	var (
@@ -250,10 +282,7 @@ func msg91(to, otp string) {
 	}
 
 	defer res.Body.Close()
-	body, _ := ioutil.ReadAll(res.Body)
-
-	fmt.Println(res)
-	fmt.Println(string(body))
+	ioutil.ReadAll(res.Body)
 }
 
 // defer measureTime("expensivePrint")()

@@ -10,6 +10,7 @@ require (
 	github.com/googollee/go-socket.io v1.4.3
 	github.com/gorilla/mux v1.7.4
 	github.com/kr/pty v1.1.3 // indirect
+	github.com/pkg/profile v1.5.0
 	github.com/pquerna/otp v1.2.0
 	github.com/zerodhatech/gokiteconnect v0.0.0-20200331064834-5f92e864864b
 	google.golang.org/api v0.25.0 // indirect
