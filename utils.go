@@ -268,7 +268,7 @@ func getValuesRedis(keys []string) []interface{} {
 func msg91(to, otp string) {
 	url := "https://api.msg91.com/api/v2/sendsms"
 
-	payload := strings.NewReader("{ \"sender\": \"MOCKAP\", \"route\": \"4\", \"country\": \"91\", \"sms\": [ { \"message\": \"" + strings.ReplaceAll(otpMessage, "##OTP##", otp) + "\", \"to\": [ \"" + to + "\"] } ] }")
+	payload := strings.NewReader("{ \"sender\": \"ASAIRA\", \"route\": \"4\", \"country\": \"91\", \"sms\": [ { \"message\": \"" + strings.ReplaceAll(otpMessage, "##OTP##", otp) + "\", \"to\": [ \"" + to + "\"] } ] }")
 
 	req, _ := http.NewRequest("POST", url, payload)
 
