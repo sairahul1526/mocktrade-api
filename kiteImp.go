@@ -10,10 +10,14 @@ import (
 )
 
 var (
-	ticker *kiteticker.Ticker
+	ticker  *kiteticker.Ticker
+	ticker2 *kiteticker.Ticker
+	ticker3 *kiteticker.Ticker
 )
 
 var tokens = []uint32{}
+var tokens2 = []uint32{}
+var tokens3 = []uint32{}
 
 // Triggered when any error is raised
 func onError(err error) {
@@ -29,6 +33,22 @@ func onClose(code int, reason string) {
 func onConnect() {
 	fmt.Println("Connected")
 	err := ticker.Subscribe(tokens)
+	if err != nil {
+		fmt.Println("onConnect", err)
+	}
+}
+
+func onConnect2() {
+	fmt.Println("Connected")
+	err := ticker2.Subscribe(tokens2)
+	if err != nil {
+		fmt.Println("onConnect", err)
+	}
+}
+
+func onConnect3() {
+	fmt.Println("Connected")
+	err := ticker3.Subscribe(tokens3)
 	if err != nil {
 		fmt.Println("onConnect", err)
 	}
@@ -53,6 +73,8 @@ func onNoReconnect(attempt int) {
 
 func connectToKite() {
 	ticker = kiteticker.New(apiKey, accessToken)
+	ticker2 = kiteticker.New(apiKey, accessToken)
+	ticker3 = kiteticker.New(apiKey, accessToken)
 
 	loadTickersToSubscribe()
 
@@ -64,8 +86,26 @@ func connectToKite() {
 	ticker.OnNoReconnect(onNoReconnect)
 	ticker.OnTick(onTick)
 
+	// Assign callbacks
+	ticker2.OnError(onError)
+	ticker2.OnClose(onClose)
+	ticker2.OnConnect(onConnect2)
+	ticker2.OnReconnect(onReconnect)
+	ticker2.OnNoReconnect(onNoReconnect)
+	ticker2.OnTick(onTick)
+
+	// Assign callbacks
+	ticker3.OnError(onError)
+	ticker3.OnClose(onClose)
+	ticker3.OnConnect(onConnect3)
+	ticker3.OnReconnect(onReconnect)
+	ticker3.OnNoReconnect(onNoReconnect)
+	ticker3.OnTick(onTick)
+
 	// Start the connection
-	ticker.Serve()
+	go ticker.Serve()
+	go ticker2.Serve()
+	go ticker3.Serve()
 }
 
 func loadTickersToSubscribe() {
@@ -78,7 +118,13 @@ func loadTickersToSubscribe() {
 	}
 	for _, instrument := range instruments {
 		fmt.Println(instrument.InstrumentToken, instrument.Tradingsymbol)
-		tokens = append(tokens, uint32(instrument.InstrumentToken))
+		if len(tokens) < 3000 {
+			tokens = append(tokens, uint32(instrument.InstrumentToken))
+		} else if len(tokens) < 6000 {
+			tokens2 = append(tokens2, uint32(instrument.InstrumentToken))
+		} else if len(tokens) < 9000 {
+			tokens3 = append(tokens3, uint32(instrument.InstrumentToken))
+		}
 	}
 
 }
